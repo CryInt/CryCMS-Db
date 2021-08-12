@@ -43,8 +43,6 @@ if (empty($tableFields)) {
     Db::sql()->query("DROP TABLE `w`")->exec();
 }
 
-die('ff');
-
 $tableFields = Db::table('test')->fields();
 
 if (empty($tableFields)) {
@@ -54,10 +52,11 @@ if (empty($tableFields)) {
         'date' => 'DATETIME',
     ], 'ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COMMENT="TEST"');
 
-    Db::table('test')->index(['id', 'date'], 'BTREE');
+    Db::table('test')->index(['id', 'date'], 'UNIQUE');
 }
 
 $isset = Db::table('testData')->isset();
+Db::print($isset);
 
 if ($isset === false) {
     Db::table('testData')->create([

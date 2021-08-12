@@ -17,7 +17,7 @@ class Db
     private $queryTable;
 
     private $querySQL;
-    private $queryValues;
+    private $queryValues = [];
 
     public function __construct($queryTable = null)
     {
@@ -116,13 +116,13 @@ class Db
 
     public function exec(): void
     {
-        self::singleton()->prepare($this->querySQL)->execute($this->queryValues);
+        $this->executeSQL();
     }
 
     public function getOne(): ?array
     {
         $sth = $this->executeSQL();
-        if ($sth !== null) {
+        if ($sth !== null && $sth !== false) {
             return $sth->fetch(PDO::FETCH_ASSOC);
         }
 
@@ -132,7 +132,7 @@ class Db
     public function getAll(): ?array
     {
         $sth = $this->executeSQL();
-        if ($sth !== null) {
+        if ($sth !== null && $sth !== false) {
             return $sth->fetchAll(PDO::FETCH_ASSOC);
         }
 
@@ -153,6 +153,7 @@ class Db
         } catch (Exception $e) {
             if (self::$debug) {
                 self::print($querySQL);
+                self::print($this->getSQL());
                 self::print($e);
             }
         }
@@ -181,10 +182,70 @@ class Db
         return $querySQL;
     }
 
-    public function create(array $fields, string $properties = ''): void
+    public function create(array $fields, string $tableProperties = ''): void
     {
-        print_r($this->queryTable);
-        print_r($fields);
+        $inlineFields = [];
+        foreach ($fields as $field => $properties) {
+            $inlineFields[] = "`" . $field . "` " . $properties;
+        }
+
+        $inlineFields = implode(", ", $inlineFields);
+
+        $this->querySQL = "CREATE TABLE `" . $this->queryTable . "` (" . $inlineFields . ") " . $tableProperties;
+        $this->exec();
+    }
+
+    public function index(array $fields, $indexType): void
+    {
+        $inlineFields = [];
+        foreach ($fields as $field) {
+            $inlineFields[] = "`" . $field . "`";
+        }
+
+        $inlineFields = implode(", ", $inlineFields);
+        $indexName = implode('_', $fields);
+
+        $this->querySQL = "ALTER TABLE `" . $this->queryTable . "` ADD " . $indexType . " " . $indexName . " (" . $inlineFields . ")";
+        $this->exec();
+    }
+
+    public function isset(): bool
+    {
+        $this->querySQL = "
+            SELECT
+                `table_name`
+            FROM
+                `information_schema`.`tables`
+            WHERE
+                table_schema = :database AND
+                table_name = :table
+        ";
+
+        $this->queryValues = [
+            'database' => self::$config['database'],
+            'table' => $this->queryTable
+        ];
+
+        return !empty($this->getOne());
+    }
+
+    public function insert(array $fields = []): void
+    {
+        $inlineSet = $this->queryValues = [];
+        if (count($fields) > 0) {
+            foreach ($fields as $key => $value) {
+                $inlineSet[] = "`" . $key . "` = :" . $key;
+                $this->queryValues[$key] = $value;
+            }
+        }
+
+        $this->querySQL = "INSERT INTO `" . $this->queryTable . "` " . (count($inlineSet) > 0 ? "SET " . implode(", ", $inlineSet) : "() VALUES ()");
+        $this->exec();
+    }
+
+    public static function lastInsertId(): string
+    {
+        return self::singleton()->lastInsertId();
     }
 
     protected function fixIn(string $query, array $fields = []): array
@@ -227,6 +288,11 @@ class Db
 
         if (is_string($data) || is_int($data) || is_float($data)) {
             echo $data . $end;
+            return;
+        }
+
+        if (is_bool($data)) {
+            var_dump($data);
             return;
         }
 
