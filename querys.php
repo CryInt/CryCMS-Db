@@ -73,12 +73,13 @@ Db::table('test')->insert([
 
 $id = Db::lastInsertId();
 
-Db::print($id);
+Db::print('ID: ' . $id);
 
 $one = Db::table('test')
-    ->select(['name', 'date'])
+    ->select(['id', 'name', 'date'])
     ->where(['id = :id'])
     ->values(['id' => $id])
+    //->getSQL();
     ->getOne();
 
 Db::print($one);
@@ -90,14 +91,16 @@ Db::table('testData')->insert([
 ]);
 
 $all = Db::table('test', 't')
-    ->select(['t.id', 'td.f1', 'td.f2'])
+    ->select(['t.id', 'td.field_1', 'td.field_2'])
     ->calcRows()
     ->leftJoin('testData', 'td', 'td.test_id = t.id')
-    ->where(['t.date =< :date'])
+    ->where(['t.date <= :date'])
     ->values(['date' => date('Y-m-d')])
     ->offset(0)
-    ->limit(10)
+    ->limit(5)
+    ->groupBy(['t.id'])
     ->orderBy(['t.id' => 'DESC'])
+    //->getSQL();
     ->getAll();
 
 Db::print($all);

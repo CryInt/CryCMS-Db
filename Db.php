@@ -15,13 +15,24 @@ class Db
     private static $log = [];
 
     private $queryTable;
+    private $queryTableAS;
 
     private $querySQL;
     private $queryValues = [];
 
-    public function __construct($queryTable = null)
+    private $queryFoundRows = false;
+    private $querySelect = [];
+    private $queryLeftJoin = [];
+    private $queryWhere = [];
+    private $queryGroup = [];
+    private $queryOrder = [];
+    private $queryOffset;
+    private $queryLimit;
+
+    public function __construct($queryTable = null, $as = null)
     {
         $this->queryTable = $queryTable;
+        $this->queryTableAS = $as;
     }
 
     public static function init(array $config): PDO
@@ -69,9 +80,9 @@ class Db
         }
     }
 
-    public static function table(string $queryTable): Db
+    public static function table(string $queryTable, string $as = null): Db
     {
-        return new Db($queryTable);
+        return new Db($queryTable, $as);
     }
 
     public function fields(): array
@@ -142,6 +153,8 @@ class Db
     private function executeSQL()
     {
         try {
+            $this->buildSQL();
+
             $querySQL = $this->querySQL;
             $queryValues = $this->queryValues;
 
@@ -163,6 +176,8 @@ class Db
 
     public function getSQL(): string
     {
+        $this->buildSQL();
+
         if (count($this->queryValues) === 0) {
             return $this->querySQL;
         }
@@ -248,6 +263,89 @@ class Db
         return self::singleton()->lastInsertId();
     }
 
+    public function select(array $fields = []): Db
+    {
+        if (count($fields) > 0) {
+            foreach ($fields as $field) {
+                $this->querySelect[$field] = self::setQuotes($field);
+            }
+        }
+
+        return $this;
+    }
+
+    public function where(array $wheres = []): Db
+    {
+        if (count($wheres) > 0) {
+            foreach ($wheres as $where) {
+                $this->queryWhere[] = self::setQuotes($where);
+            }
+        }
+
+        return $this;
+    }
+
+    public function values(array $values = []): Db
+    {
+        if (count($values) > 0) {
+            foreach ($values as $field => $value) {
+                $this->queryValues[$field] = $value;
+            }
+        }
+
+        return $this;
+    }
+
+    public function calcRows(bool $set = true): Db
+    {
+        $this->queryFoundRows = $set;
+
+        return $this;
+    }
+
+    public function leftJoin(string $table, string $as, string $on): Db
+    {
+        $this->queryLeftJoin[$table] = self::setQuotes($table . ' AS ' . $as . ' ON (' . $on . ')');
+
+        return $this;
+    }
+
+    public function groupBy(array $groups = []): Db
+    {
+        if (count($groups) > 0) {
+            foreach ($groups as $group) {
+                $this->queryGroup[] = self::setQuotes($group);
+            }
+        }
+
+        return $this;
+    }
+
+    public function orderBy(array $orders = []): Db
+    {
+        if (count($orders) > 0) {
+            foreach ($orders as $field => $order) {
+                $this->queryOrder[$field] = self::setQuotes($field) . ' ' . $order;
+            }
+        }
+
+        return $this;
+    }
+
+    public function offset(int $offset): Db
+    {
+        $this->queryOffset = $offset;
+
+        return $this;
+    }
+
+    public function limit(int $limit): Db
+    {
+        $this->queryLimit = $limit;
+
+        return $this;
+    }
+
     protected function fixIn(string $query, array $fields = []): array
     {
         preg_match_all('/IN \((.*)\)/iU', $query, $matches);
@@ -277,6 +375,122 @@ class Db
         }
 
         return [$query, $fields];
+    }
+
+    public static function setQuotes(string $field): string
+    {
+        $new = str_replace("`", "", $field);
+
+        return preg_replace_callback(
+            '/([:a-zA-Z0-9_]+)/i',
+            static function ($matches) {
+                if (strpos($matches[0], ":") !== false) {
+                    return $matches[0];
+                }
+
+                if ($matches[0] === 'OR' || $matches[0] === 'AND' || $matches[0] === 'AS' || $matches[0] === 'ON') {
+                    return $matches[0];
+                }
+
+                return "`" . $matches[0] . "`";
+            },
+            $new
+        );
+    }
+
+    public function buildSQL(): void
+    {
+        if (!empty($this->querySQL)) {
+            return;
+        }
+
+        $sql = [];
+
+        $sql[] = $this->getSQLSelect();
+        $sql[] = $this->getSQLFrom();
+        $sql[] = $this->getSQLLeftJoin();
+        $sql[] = $this->getSQLWhere();
+        $sql[] = $this->getSQLGroup();
+        $sql[] = $this->getSQLOrder();
+        $sql[] = $this->getSQLOffset();
+        $sql[] = $this->getSQLLimit();
+
+        $this->querySQL = implode("", $sql);
+    }
+
+    private function getSQLSelect(): string
+    {
+        return 'SELECT ' .
+            ($this->queryFoundRows ? 'SQL_CALC_FOUND_ROWS ' : '') .
+            (!empty($this->querySelect) ? implode(', ', $this->querySelect) : '*') .
+            ' ';
+    }
+
+    private function getSQLFrom(): string
+    {
+        return 'FROM `' . $this->queryTable . '` ' . (!empty($this->queryTableAS) ? 'AS `' . $this->queryTableAS . '` ' : '');
+    }
+
+    private function getSQLLeftJoin(): string
+    {
+        $joins = [];
+
+        foreach ($this->queryLeftJoin as $join) {
+            $joins[] = 'LEFT JOIN ' . $join . ' ';
+        }
+
+        return implode('', $joins);
+    }
+
+    private function getSQLWhere(): string
+    {
+        if (empty($this->queryWhere)) {
+            return '';
+        }
+
+        return 'WHERE ' . implode(' AND ', $this->queryWhere) . ' ';
+    }
+
+    private function getSQLGroup(): string
+    {
+        if (empty($this->queryGroup)) {
+            return '';
+        }
+
+        return 'GROUP BY ' . implode(', ', $this->queryGroup) . ' ';
+    }
+
+    private function getSQLOrder(): string
+    {
+        if (empty($this->queryOrder)) {
+            return '';
+        }
+
+        return 'ORDER BY ' . implode(', ', $this->queryOrder) . ' ';
+    }
+
+    private function getSQLOffset(): string
+    {
+        if (empty($this->queryOffset)) {
+            return '';
+        }
+
+        return 'OFFSET ' . $this->queryOffset . ' ';
+    }
+
+    private function getSQLLimit(): string
+    {
+        if (empty($this->queryLimit)) {
+            return '';
+        }
+
+        return 'LIMIT ' . $this->queryLimit . ' ';
+    }
+
+    public static function getFoundRows(): int
+    {
+        $result = self::sql()->query('SELECT FOUND_ROWS()')->getOne();
+        return $result['FOUND_ROWS()'] ?? 0;
     }
 
     public static function print($data): void
