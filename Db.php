@@ -29,10 +29,20 @@ class Db
     private $queryOffset;
     private $queryLimit;
 
+    private $timeStart;
+    private $traceFrom;
+
     public function __construct($queryTable = null, $as = null)
     {
         $this->queryTable = $queryTable;
         $this->queryTableAS = $as;
+
+        $this->timeStart = self::getMicroTime();
+
+        $trace = debug_backtrace();
+        if (!empty($trace[1]['file']) && isset($trace[1]['line'])) {
+            $this->traceFrom = str_replace(__DIR__, '', $trace[1]['file']) . ':' . $trace[1]['line'];
+        }
     }
 
     public static function init(array $config): PDO
@@ -55,7 +65,6 @@ class Db
     private static function singleton(): PDO
     {
         if (!is_object(self::$dbh)) {
-                                                            self::print("INIT");
             self::$dbh = self::init(self::$config);
         }
 
@@ -89,19 +98,19 @@ class Db
     {
         $query = "
             SELECT
-                   COLUMN_NAME,
-                   DATA_TYPE,
-                   COLUMN_KEY,
-                   COLUMN_DEFAULT,
-                   IS_NULLABLE,
-                   CHARACTER_MAXIMUM_LENGTH
+                COLUMN_NAME,
+                DATA_TYPE,
+                COLUMN_KEY,
+                COLUMN_DEFAULT,
+                IS_NULLABLE,
+                CHARACTER_MAXIMUM_LENGTH
             FROM
-                 information_schema.COLUMNS
+                information_schema.COLUMNS
             WHERE
-                  TABLE_SCHEMA = DATABASE() AND
-                  TABLE_NAME = :table
+                TABLE_SCHEMA = DATABASE() AND
+                TABLE_NAME = :table
             ORDER BY
-                  ORDINAL_POSITION
+                ORDINAL_POSITION
         ";
 
         $sth = self::singleton()->prepare($query);
@@ -130,17 +139,17 @@ class Db
         $this->executeSQL();
     }
 
-    public function getOne(): ?array
+    public function getOne()
     {
         $sth = $this->executeSQL();
-        if ($sth !== null && $sth !== false) {
+        if ($sth !== null) {
             return $sth->fetch(PDO::FETCH_ASSOC);
         }
 
         return null;
     }
 
-    public function getAll(): ?array
+    public function getAll()
     {
         $sth = $this->executeSQL();
         if ($sth !== null && $sth !== false) {
@@ -162,10 +171,21 @@ class Db
 
             $sth = self::singleton()->prepare($querySQL);
             $sth->execute($queryValues);
+
+            if (self::$debug) {
+                self::$log[] = [
+                    'query' => $this->getSQL(),
+                    'template' => $this->querySQL,
+                    'values' => $this->queryValues,
+                    'time' => self::getMicroTime() - $this->timeStart,
+                    'from' => $this->traceFrom,
+                ];
+            }
+
             return $sth;
         } catch (Exception $e) {
             if (self::$debug) {
-                self::print($querySQL);
+                self::print($querySQL ?? null);
                 self::print($this->getSQL());
                 self::print($e);
             }
@@ -261,6 +281,61 @@ class Db
     public static function lastInsertId(): string
     {
         return self::singleton()->lastInsertId();
+    }
+
+    public function update(array $sets, array $wheres, array $values = []): void
+    {
+        $inlineSet = [];
+
+        $this->queryValues = $values;
+
+        foreach ($sets as $key => $value) {
+            if ($value === 'NULL') {
+                $value = null;
+            }
+
+            $inlineSet[] = "`" . $key . "` = :upd_" . $key;
+            $this->queryValues['upd_' . $key] = $value;
+        }
+
+        $inlineWhere = $this->buildWhereForUD($wheres);
+
+        $inlineSet = implode(', ', $inlineSet);
+        $inlineWhere = implode(' AND ', $inlineWhere);
+
+        $this->querySQL = "UPDATE `" . $this->queryTable . "` SET " . $inlineSet . " WHERE " . $inlineWhere;
+        $this->exec();
+    }
+
+    public function delete(array $wheres, array $values = []): void
+    {
+        $this->queryValues = $values;
+
+        $inlineWhere = $this->buildWhereForUD($wheres);
+        $inlineWhere = implode(' AND ', $inlineWhere);
+
+        $this->querySQL = "DELETE FROM `" . $this->queryTable . "` WHERE " . $inlineWhere;
+        $this->exec();
+    }
+
+    private function buildWhereForUD(array $wheres): array
+    {
+        $inlineWhere = [];
+
+        foreach ($wheres as $key => $value) {
+            if (is_numeric($key)) {
+                $inlineWhere[] = self::setQuotes($value);
+            }
+            else if ($value === null) {
+                $inlineWhere[] = '`' . $key . '` IS NULL';
+            }
+            else {
+                $inlineWhere[] = '`' . $key . '` = :whr_' . $key;
+                $this->queryValues['whr_' . $key] = $value;
+            }
+        }
+
+        return $inlineWhere;
     }
 
     public function select(array $fields = []): Db
@@ -493,10 +568,33 @@ class Db
         return $result['FOUND_ROWS()'] ?? 0;
     }
 
+    public function truncate(): void
+    {
+        $this->querySQL = 'TRUNCATE `' . $this->queryTable . '`';
+        $this->exec();
+    }
+
+    public function drop(): void
+    {
+        $this->querySQL = 'DROP TABLE `' . $this->queryTable . '`';
+        $this->exec();
+    }
+
+    public static function getLog(): array
+    {
+        return self::$log;
+    }
+
+    public static function getMicroTime(): float
+    {
+        [$uSec, $sec] = explode(" ", microtime());
+        return ((float)$uSec + (float)$sec);
+    }
+
     public static function print($data): void
     {
         $end = "<br>";
-        if (is_string($data) && strpos(PHP_SAPI, 'cli') !== false) {
+        if (strpos(PHP_SAPI, 'cli') !== false) {
             $end = "\r\n";
         }
 

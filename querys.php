@@ -103,11 +103,12 @@ $all = Db::table('test', 't')
     //->getSQL();
     ->getAll();
 
+Db::print("ALL:");
 Db::print($all);
 
 $count = Db::getFoundRows();
 
-Db::print($count);
+Db::print('COUNT: ' . $count);
 
 Db::table('testData')->update([
     'field_1' => 'F5'
@@ -123,12 +124,14 @@ Db::table('testData')->update([
     'id' => $id,
 ]);
 
+Db::table('test')->update(['date' => '1984-04-20'], ['date' => null]);
+
 Db::table('testData')->delete([
-    'id' => $id
+    'test_id' => $id
 ]);
 
 Db::table('test')->delete([
-    'date =< :date'
+    'date <= :date'
 ], [
     'date' => date('Y-m-d')
 ]);
