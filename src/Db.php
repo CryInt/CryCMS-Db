@@ -1,4 +1,9 @@
 <?php
+namespace CryCMS;
+
+use Exception;
+use PDO;
+
 class Db
 {
     private static $config = [
