@@ -14,11 +14,14 @@ class Db
 
     private static $log = [];
 
-    private $table;
+    private $queryTable;
 
-    public function __construct($table)
+    private $querySQL;
+    private $queryValues;
+
+    public function __construct($queryTable = null)
     {
-        $this->table = $table;
+        $this->queryTable = $queryTable;
     }
 
     public static function init(array $config): PDO
@@ -31,7 +34,9 @@ class Db
             return self::$dbh;
         }
         catch (Exception $e) {
-            print_r($e);
+            if (self::$debug) {
+                self::print($e);
+            }
             die("error db connection");
         }
     }
@@ -39,7 +44,7 @@ class Db
     private static function singleton(): PDO
     {
         if (!is_object(self::$dbh)) {
-            print_r("INIT");
+                                                            self::print("INIT");
             self::$dbh = self::init(self::$config);
         }
 
@@ -64,9 +69,9 @@ class Db
         }
     }
 
-    public static function table(string $table): Db
+    public static function table(string $queryTable): Db
     {
-        return new Db($table);
+        return new Db($queryTable);
     }
 
     public function fields(): array
@@ -90,20 +95,141 @@ class Db
 
         $sth = self::singleton()->prepare($query);
         $sth->execute([
-            'table' => $this->table
+            'table' => $this->queryTable
         ]);
 
         return $sth->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function create(array $fields): void
+    public static function sql(): Db
     {
-        print_r($this->table);
+        return new Db();
+    }
+
+    public function query(string $query, array $values = []): Db
+    {
+        $this->querySQL = $query;
+        $this->queryValues = $values;
+
+        return $this;
+    }
+
+    public function exec(): void
+    {
+        self::singleton()->prepare($this->querySQL)->execute($this->queryValues);
+    }
+
+    public function getOne(): ?array
+    {
+        $sth = $this->executeSQL();
+        if ($sth !== null) {
+            return $sth->fetch(PDO::FETCH_ASSOC);
+        }
+
+        return null;
+    }
+
+    public function getAll(): ?array
+    {
+        $sth = $this->executeSQL();
+        if ($sth !== null) {
+            return $sth->fetchAll(PDO::FETCH_ASSOC);
+        }
+
+        return null;
+    }
+
+    private function executeSQL()
+    {
+        try {
+            $querySQL = $this->querySQL;
+            $queryValues = $this->queryValues;
+
+            [$querySQL, $queryValues] = $this->fixIn($querySQL, $queryValues);
+
+            $sth = self::singleton()->prepare($querySQL);
+            $sth->execute($queryValues);
+            return $sth;
+        } catch (Exception $e) {
+            if (self::$debug) {
+                self::print($querySQL);
+                self::print($e);
+            }
+        }
+
+        return null;
+    }
+
+    public function getSQL(): string
+    {
+        if (count($this->queryValues) === 0) {
+            return $this->querySQL;
+        }
+
+        $querySQL = $this->querySQL;
+        $queryValues = $this->queryValues;
+
+        [$querySQL, $queryValues] = $this->fixIn($querySQL, $queryValues);
+
+        $keys = array_map('strlen', array_keys($queryValues));
+        array_multisort($keys, SORT_DESC, $queryValues);
+
+        foreach($queryValues as $fKey => $fValue) {
+            $querySQL = str_replace(":".$fKey, "'".$fValue."'", $querySQL);
+        }
+
+        return $querySQL;
+    }
+
+    public function create(array $fields, string $properties = ''): void
+    {
+        print_r($this->queryTable);
         print_r($fields);
     }
 
-    public static function test(): void
+    protected function fixIn(string $query, array $fields = []): array
     {
+        preg_match_all('/IN \((.*)\)/iU', $query, $matches);
+        if (!empty($matches[1]) && is_array($matches[1]) && count($matches) > 0) {
+            foreach ($matches[1] as $inKey) {
+                $key = str_replace(":", "", $inKey);
+                if (isset($fields[$key])) {
+                    $num_of_in = count($fields[$key]);
 
+                    $keys = [];
+                    $values = [];
+
+                    if ($num_of_in > 0) {
+                        foreach ($fields[$key] as $n => $value) {
+                            $n = sprintf("%03d", $n);
+                            $keys[] = ":" . $key . $n;
+                            $values[$key . $n] = $value;
+                        }
+                    }
+
+                    $query = str_replace(":" . $key, implode(", ", $keys), $query);
+
+                    unset($fields[$key]);
+                    $fields += $values;
+                }
+            }
+        }
+
+        return [$query, $fields];
+    }
+
+    public static function print($data): void
+    {
+        $end = "<br>";
+        if (is_string($data) && strpos(PHP_SAPI, 'cli') !== false) {
+            $end = "\r\n";
+        }
+
+        if (is_string($data) || is_int($data) || is_float($data)) {
+            echo $data . $end;
+            return;
+        }
+
+        print_r($data);
     }
 }

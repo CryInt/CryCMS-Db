@@ -10,6 +10,41 @@ Db::config([
 
 Db::debug(true);
 
+$tableFields = Db::table('w')->fields();
+
+if (empty($tableFields)) {
+    Db::sql()->query("
+        CREATE TABLE `w` (
+            `q1` int(12) UNSIGNED NOT NULL,
+            `q2` varchar(50) DEFAULT NULL,
+            `q3` datetime NOT NULL,
+            `q4` decimal(10,2) NOT NULL DEFAULT 0.00
+        )
+        ENGINE=MyISAM
+        DEFAULT
+        CHARSET=utf8mb4
+        COMMENT='TEST';
+    ")->exec();
+
+    Db::sql()->query("INSERT INTO `w` SET `q3` = :date", ['date' => date('Y-m-d')])->exec();
+    Db::sql()->query("INSERT INTO `w` SET `q3` = :date", ['date' => date('Y-m-d')])->exec();
+
+    $result = Db::sql()->query("SELECT * FROM `w`")->getOne();
+    Db::print($result);
+
+    $result = Db::sql()->query("SELECT * FROM `w` WHERE `q3` IN (:date)", [
+        'date' => [
+            date('Y-m-d'),
+            date('Y-m-d', strtotime('-1 month'))
+        ]
+    ])->getAll();
+    Db::print($result);
+
+    Db::sql()->query("DROP TABLE `w`")->exec();
+}
+
+die('ff');
+
 $tableFields = Db::table('test')->fields();
 
 if (empty($tableFields)) {
@@ -17,7 +52,7 @@ if (empty($tableFields)) {
         'id' => 'INT(10) UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY',
         'name' => 'VARCHAR(255)',
         'date' => 'DATETIME',
-    ]);
+    ], 'ENGINE=MyISAM DEFAULT CHARSET=utf8mb4 COMMENT="TEST"');
 
     Db::table('test')->index(['id', 'date'], 'BTREE');
 }
@@ -39,7 +74,7 @@ Db::table('test')->insert([
 
 $id = Db::lastInsertId();
 
-print_r($id);
+Db::print($id);
 
 $one = Db::table('test')
     ->select(['name', 'date'])
@@ -47,7 +82,7 @@ $one = Db::table('test')
     ->values(['id' => $id])
     ->getOne();
 
-print_r($one);
+Db::print($one);
 
 Db::table('testData')->insert([
     'test_id' => $id,
@@ -57,6 +92,7 @@ Db::table('testData')->insert([
 
 $all = Db::table('test', 't')
     ->select(['t.id', 'td.f1', 'td.f2'])
+    ->calcRows()
     ->leftJoin('testData', 'td', 'td.test_id = t.id')
     ->where(['t.date =< :date'])
     ->values(['date' => date('Y-m-d')])
@@ -65,7 +101,11 @@ $all = Db::table('test', 't')
     ->orderBy(['t.id' => 'DESC'])
     ->getAll();
 
-print_r($all);
+Db::print($all);
+
+$count = Db::getFoundRows();
+
+Db::print($count);
 
 Db::table('testData')->update([
     'field_1' => 'F5'
@@ -97,4 +137,4 @@ Db::table('testData')->drop();
 Db::table('test')->drop();
 
 $log = Db::getLog();
-print_r($log);
+Db::print($log);
