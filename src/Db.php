@@ -229,7 +229,7 @@ class Db
         $inlineFields = implode(", ", $inlineFields);
 
         $this->querySQL = "CREATE TABLE `" . $this->queryTable . "` (" . $inlineFields . ") " . $tableProperties;
-        $this->exec();
+        $this->executeSQL();
     }
 
     public function index(array $fields, $indexType): void
@@ -243,7 +243,7 @@ class Db
         $indexName = implode('_', $fields);
 
         $this->querySQL = "ALTER TABLE `" . $this->queryTable . "` ADD " . $indexType . " " . $indexName . " (" . $inlineFields . ")";
-        $this->exec();
+        $this->executeSQL();
     }
 
     public function isset(): bool
@@ -277,7 +277,7 @@ class Db
         }
 
         $this->querySQL = "INSERT INTO `" . $this->queryTable . "` " . (count($inlineSet) > 0 ? "SET " . implode(", ", $inlineSet) : "() VALUES ()");
-        $this->exec();
+        $this->executeSQL();
     }
 
     public static function lastInsertId(): string
@@ -306,7 +306,7 @@ class Db
         $inlineWhere = implode(' AND ', $inlineWhere);
 
         $this->querySQL = "UPDATE `" . $this->queryTable . "` SET " . $inlineSet . " WHERE " . $inlineWhere;
-        $this->exec();
+        $this->executeSQL();
     }
 
     public function delete(array $wheres, array $values = []): void
@@ -317,7 +317,7 @@ class Db
         $inlineWhere = implode(' AND ', $inlineWhere);
 
         $this->querySQL = "DELETE FROM `" . $this->queryTable . "` WHERE " . $inlineWhere;
-        $this->exec();
+        $this->executeSQL();
     }
 
     private function buildWhereForUD(array $wheres): array
@@ -573,13 +573,13 @@ class Db
     public function truncate(): void
     {
         $this->querySQL = 'TRUNCATE `' . $this->queryTable . '`';
-        $this->exec();
+        $this->executeSQL();
     }
 
     public function drop(): void
     {
         $this->querySQL = 'DROP TABLE `' . $this->queryTable . '`';
-        $this->exec();
+        $this->executeSQL();
     }
 
     public static function getLog(): array
