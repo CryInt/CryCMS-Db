@@ -44,10 +44,7 @@ class Db
 
         $this->timeStart = self::getMicroTime();
 
-        $trace = debug_backtrace();
-        if (!empty($trace[1]['file']) && isset($trace[1]['line'])) {
-            $this->traceFrom = str_replace(__DIR__, '', $trace[1]['file']) . ':' . $trace[1]['line'];
-        }
+        $this->traceFrom = $this->getInitiatorFromTrace(debug_backtrace());
     }
 
     public static function init(array $config): PDO
@@ -594,6 +591,25 @@ class Db
     {
         [$uSec, $sec] = explode(" ", microtime());
         return ((float)$uSec + (float)$sec);
+    }
+
+    private function getInitiatorFromTrace($trace): string
+    {
+        if (!empty($trace)) {
+            foreach ($trace as $step) {
+                if (empty($step['file'])) {
+                    continue;
+                }
+
+                if ($step['file'] === __FILE__) {
+                    continue;
+                }
+
+                return $step['file'] . ':' . $step['line'];
+            }
+        }
+
+        return '';
     }
 
     public static function print($data): void
