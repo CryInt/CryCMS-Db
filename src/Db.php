@@ -37,6 +37,10 @@ class Db
     private $timeStart;
     private $traceFrom;
 
+    private static $withoutQuotes = [
+        'OR', 'AND', 'AS', 'ON', 'LIKE',
+    ];
+
     public function __construct($queryTable = null, $as = null)
     {
         $this->queryTable = $queryTable;
@@ -465,7 +469,8 @@ class Db
                     return $matches[0];
                 }
 
-                if ($matches[0] === 'OR' || $matches[0] === 'AND' || $matches[0] === 'AS' || $matches[0] === 'ON') {
+                $match = mb_strtoupper($matches[0], 'UTF-8');
+                if (in_array($match, self::$withoutQuotes, true) === true) {
                     return $matches[0];
                 }
 

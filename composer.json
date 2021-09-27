@@ -3,7 +3,8 @@
     "description": "class for mysql with pdo",
     "type": "library",
     "require": {
-        "ext-pdo": "*"
+        "ext-pdo": "*",
+        "ext-mbstring": "*"
     },
     "license": "free",
     "autoload": {
