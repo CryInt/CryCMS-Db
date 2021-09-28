@@ -38,7 +38,8 @@ class Db
     private $traceFrom;
 
     private static $withoutQuotes = [
-        'OR', 'AND', 'AS', 'ON', 'LIKE',
+        'OR', 'AND', 'AS', 'ON', 'LIKE', 'IS', 'NOT', 'NULL', 'BETWEEN',
+        'CASE', 'DATE', 'DATETIME', 'IN',
     ];
 
     public function __construct($queryTable = null, $as = null)
