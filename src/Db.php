@@ -37,11 +37,6 @@ class Db
     private $timeStart;
     private $traceFrom;
 
-    private static $withoutQuotes = [
-        'OR', 'AND', 'AS', 'ON', 'LIKE', 'IS', 'NOT', 'NULL', 'BETWEEN',
-        'CASE', 'DATE', 'DATETIME', 'IN',
-    ];
-
     public function __construct($queryTable = null, $as = null)
     {
         $this->queryTable = $queryTable;
@@ -464,14 +459,19 @@ class Db
         $new = str_replace("`", "", $field);
 
         return preg_replace_callback(
-            '/([:a-zA-Z0-9_]+)/i',
+            '/([:a-zA-Z0-9_]+)/',
             static function ($matches) {
                 if (strpos($matches[0], ":") !== false) {
                     return $matches[0];
                 }
 
-                $match = mb_strtoupper($matches[0], 'UTF-8');
-                if (in_array($match, self::$withoutQuotes, true) === true) {
+                // int - without quotes
+                if (is_numeric($matches[0]) !== false) {
+                    return $matches[0];
+                }
+
+                // word contains only all uppercase symbols - without quotes
+                if (mb_strtoupper($matches[0], 'UTF-8') === $matches[0]) {
                     return $matches[0];
                 }
 
