@@ -73,6 +73,11 @@ class Db
         return self::$dbh;
     }
 
+    public static function getInstance(): ?PDO
+    {
+        return self::singleton();
+    }
+
     public static function debug(bool $set): void
     {
         self::$debug = $set;
@@ -105,7 +110,10 @@ class Db
                 COLUMN_KEY,
                 COLUMN_DEFAULT,
                 IS_NULLABLE,
-                CHARACTER_MAXIMUM_LENGTH
+                CHARACTER_MAXIMUM_LENGTH,
+                NUMERIC_PRECISION,
+                NUMERIC_SCALE,
+                COLUMN_TYPE
             FROM
                 information_schema.COLUMNS
             WHERE
