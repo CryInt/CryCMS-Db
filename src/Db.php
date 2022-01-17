@@ -503,8 +503,8 @@ class Db
         $sql[] = $this->getSQLWhere();
         $sql[] = $this->getSQLGroup();
         $sql[] = $this->getSQLOrder();
-        $sql[] = $this->getSQLOffset();
         $sql[] = $this->getSQLLimit();
+        $sql[] = $this->getSQLOffset();
 
         $this->querySQL = implode("", $sql);
     }
