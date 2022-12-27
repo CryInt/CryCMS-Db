@@ -363,8 +363,14 @@ class Db
     public function where(array $wheres = []): Db
     {
         if (count($wheres) > 0) {
-            foreach ($wheres as $where) {
-                $this->queryWhere[] = self::setQuotes($where);
+            foreach ($wheres as $key => $where) {
+                if (is_numeric($key)) {
+                    $this->queryWhere[] = self::setQuotes($where);
+                }
+                else {
+                    $this->queryWhere[] = self::setQuotes($key . ' = :' . $key);
+                    $this->queryValues[$key] = $where;
+                }
             }
         }
 

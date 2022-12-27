@@ -95,12 +95,20 @@ Db::table('table')->insert([
 $id = Db::lastInsertId();
 ```
 
-`Получение одной записи`
+`Получение одной записи - вариант 1`
 ```php
 $one = Db::table('table')
     ->select(['id', 'name', 'date'])
     ->where(['id = :id'])
     ->values(['id' => $id])
+    ->getOne();
+```
+
+`Получение одной записи - вариант 2`
+```php
+$one = Db::table('table')
+    ->select(['id', 'name', 'date'])
+    ->where(['id' => 1])
     ->getOne();
 ```
 
