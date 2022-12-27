@@ -160,4 +160,25 @@ Db::table('test')->delete([
 ]);
 ```
 
+`Новый инстанс с отдельным подключением`
+```php
+use CryCMS\Db;
+
+class Db2 extends Db
+{
+    protected static $config;
+    protected static $dbh;
+    protected static $debug = false;
+    protected static $log = [];
+}
+
+Db2::config(
+    [
+        'host' => '',
+        'user' => '',
+        'password' => '',
+        'database' => '',
+    ]
+);
+```
 

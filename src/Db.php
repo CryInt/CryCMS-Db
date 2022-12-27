@@ -6,18 +6,10 @@ use PDO;
 
 class Db
 {
-    private static $config = [
-        'host' => null,
-        'user' => null,
-        'password' => null,
-        'database' => null,
-    ];
-
-    private static $dbh;
-
-    private static $debug = false;
-
-    private static $log = [];
+    protected static $config;
+    protected static $dbh;
+    protected static $debug = false;
+    protected static $log = [];
 
     private $queryTable;
     private $queryTableAS;
@@ -47,18 +39,18 @@ class Db
         $this->traceFrom = $this->getInitiatorFromTrace(debug_backtrace());
     }
 
-    public static function init(array $config): PDO
+    protected static function init(array $config): PDO
     {
         try {
-            self::$dbh = new PDO("mysql:dbname=" . $config['database'] . ";host=" . $config['host'], $config['user'], $config['password']);
-            self::$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            self::$dbh->exec("SET NAMES 'UTF8';");
-            self::$dbh->exec("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';");
-            return self::$dbh;
+            static::$dbh = new PDO("mysql:dbname=" . $config['database'] . ";host=" . $config['host'], $config['user'], $config['password']);
+            static::$dbh->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            static::$dbh->exec("SET NAMES 'UTF8';");
+            static::$dbh->exec("SET SESSION sql_mode = 'NO_ENGINE_SUBSTITUTION';");
+            return static::$dbh;
         }
         catch (Exception $e) {
-            if (self::$debug) {
-                self::print($e);
+            if (static::$debug) {
+                static::print($e);
             }
             die("error db connection");
         }
@@ -66,21 +58,21 @@ class Db
 
     private static function singleton(): PDO
     {
-        if (!is_object(self::$dbh)) {
-            self::$dbh = self::init(self::$config);
+        if (!is_object(static::$dbh)) {
+            static::$dbh = static::init(static::$config);
         }
 
-        return self::$dbh;
+        return static::$dbh;
     }
 
     public static function getInstance(): ?PDO
     {
-        return self::singleton();
+        return static::singleton();
     }
 
     public static function debug(bool $set): void
     {
-        self::$debug = $set;
+        static::$debug = $set;
     }
 
     public static function config(array $config): void
@@ -89,16 +81,25 @@ class Db
             return;
         }
 
+        if (static::$config === null) {
+            static::$config = [
+                'host' => null,
+                'user' => null,
+                'password' => null,
+                'database' => null,
+            ];
+        }
+
         foreach ($config as $key => $value) {
-            if (array_key_exists($key, self::$config) !== false) {
-                self::$config[$key] = $value;
+            if (array_key_exists($key, static::$config) !== false) {
+                static::$config[$key] = $value;
             }
         }
     }
 
     public static function table(string $queryTable, string $as = null): Db
     {
-        return new Db($queryTable, $as);
+        return new static($queryTable, $as);
     }
 
     public function fields(): array
@@ -123,7 +124,7 @@ class Db
                 ORDINAL_POSITION
         ";
 
-        $sth = self::singleton()->prepare($query);
+        $sth = static::singleton()->prepare($query);
         $sth->execute([
             'table' => $this->queryTable
         ]);
@@ -133,7 +134,7 @@ class Db
 
     public static function sql(): Db
     {
-        return new Db();
+        return new static();
     }
 
     public function query(string $query, array $values = []): Db
@@ -179,11 +180,11 @@ class Db
 
             [$querySQL, $queryValues] = $this->fixIn($querySQL, $queryValues);
 
-            $sth = self::singleton()->prepare($querySQL);
+            $sth = static::singleton()->prepare($querySQL);
             $sth->execute($queryValues);
 
-            if (self::$debug) {
-                self::$log[] = [
+            if (static::$debug) {
+                static::$log[] = [
                     'query' => $this->getSQL(),
                     'template' => $this->querySQL,
                     'values' => $this->queryValues,
@@ -194,10 +195,10 @@ class Db
 
             return $sth;
         } catch (Exception $e) {
-            if (self::$debug) {
-                self::print($querySQL ?? null);
-                self::print($this->getSQL());
-                self::print($e);
+            if (static::$debug) {
+                static::print($querySQL ?? null);
+                static::print($this->getSQL());
+                static::print($e);
             }
         }
 
@@ -267,7 +268,7 @@ class Db
         ";
 
         $this->queryValues = [
-            'database' => self::$config['database'],
+            'database' => static::$config['database'],
             'table' => $this->queryTable
         ];
 
@@ -290,7 +291,7 @@ class Db
 
     public static function lastInsertId(): string
     {
-        return self::singleton()->lastInsertId();
+        return static::singleton()->lastInsertId();
     }
 
     public function update(array $sets, array $wheres, array $values = []): void
@@ -580,7 +581,7 @@ class Db
 
     public static function getFoundRows(): int
     {
-        $result = self::sql()->query('SELECT FOUND_ROWS()')->getOne();
+        $result = static::sql()->query('SELECT FOUND_ROWS()')->getOne();
         return $result['FOUND_ROWS()'] ?? 0;
     }
 
@@ -598,7 +599,7 @@ class Db
 
     public static function getLog(): array
     {
-        return self::$log;
+        return static::$log;
     }
 
     public static function getMicroTime(): float
