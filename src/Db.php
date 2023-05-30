@@ -1,4 +1,7 @@
 <?php
+/** @noinspection SqlResolve */
+/** @noinspection PhpUnused */
+
 namespace CryCMS;
 
 use Exception;
