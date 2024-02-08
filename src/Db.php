@@ -155,6 +155,10 @@ class Db
 
     public function getOne()
     {
+        if ($this->queryLimit === null) {
+            $this->limit(1);
+        }
+
         $sth = $this->executeSQL();
         if ($sth !== null) {
             return $sth->fetch(PDO::FETCH_ASSOC);
