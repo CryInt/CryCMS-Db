@@ -100,7 +100,7 @@ class Db
         }
     }
 
-    public static function table(string $queryTable, string $as = null): Db
+    public static function table(string $queryTable, ?string $as = null): Db
     {
         return new static($queryTable, $as);
     }

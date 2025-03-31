@@ -1,12 +1,13 @@
 {
     "name": "cry/cry-cms-db",
     "description": "class for mysql with pdo",
+    "version": "1.10",
     "type": "library",
     "require": {
         "ext-pdo": "*",
         "ext-mbstring": "*"
     },
-    "license": "free",
+    "license": "MIT",
     "autoload": {
         "psr-4": {
             "CryCMS\\": "src/"
@@ -14,7 +15,7 @@
     },
     "authors": [
         {
-            "name": "Дмитрий Cry",
+            "name": "Cry.Int",
             "email": "cry.int@gmail.com"
         }
     ]
